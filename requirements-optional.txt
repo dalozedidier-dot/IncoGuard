@@ -1,0 +1,5 @@
+# Dependances optionnelles pour modes avances.
+ruptures
+tigramite
+great_expectations
+dvc

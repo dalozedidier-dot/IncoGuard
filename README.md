@@ -1,49 +1,31 @@
-# FluxGuard
+# FluxGuard v10 (data-aware, toujours minimaliste)
 
-Objectif: tests intermédiaires rapides pour évaluer sensibilité à la dérive.
+Objectif: conserver la philosophie deterministe et auditee, tout en ajoutant une couche data-awareness sans boite noire.
 
-## Niveau 1: dérive intentionnelle (déjà prêt)
-Deux datasets fournis:
-- `datasets/example.csv`
-- `datasets/example_drift.csv` (b augmente de 5% sur la fin, c change de signe sur la fin)
+## Ce qui est ajoute
+1) RiftLens
+- Ruptures locales par fenetres en stdlib.
+- Mode causal lite (lags, correlation dirigee) en stdlib.
+- Si ruptures est installe, option d'utilisation (fallback automatique).
 
-Exécuter:
+2) VoidMark
+- Fingerprint statistique CSV (mean, std, quantiles, MAD, missingness).
+- Comparaison a un baseline mark, KS test lite (approx) en stdlib.
+- Historique de versions local (type DVC-lite): fichier JSON append-only.
+
+3) NullTrace
+- Mode data-aware: checks de qualite sur sous-echantillons deterministes.
+- Mini moteur de regles: fichier texte rules.yml simple (cle: expression), evalue via AST safe.
+
+## Execution (local)
 ```bash
 cd fluxguard
-python fluxguard.py all --shadow-prev datasets/example.csv --shadow-curr datasets/example_drift.csv --output-dir _ci_out/full_drift
+python fluxguard.py all --shadow-prev datasets/example.csv --shadow-curr datasets/example_drift.csv --output-dir _ci_out/full
+python fluxguard.py riftlens --input datasets/example_drift.csv --local-ruptures --output-dir _ci_out/riftlens
+python fluxguard.py riftlens --input datasets/example_drift.csv --mode causal --max-lag 3 --output-dir _ci_out/riftlens_causal
+python fluxguard.py voidmark --input datasets/example_drift.csv --baseline-mark _ci_out/full/step2_voidmark/vault/voidmark_mark.json --output-dir _ci_out/voidmark
+python fluxguard.py nulltrace --runs 50 --data-aware --input datasets/example_drift.csv --rules ../rules.yml --output-dir _ci_out/nulltrace
 ```
 
-## Augmentation des runs
-VoidMark (standalone):
-```bash
-python fluxguard.py voidmark --input datasets/example.csv --runs 1000 --noise 0.05 --output-dir _ci_out/voidmark_big
-```
-
-VoidMark dans la chaîne:
-```bash
-python fluxguard.py all --shadow-prev datasets/example.csv --shadow-curr datasets/example_drift.csv \
-  --void-runs 1000 --void-noise 0.05 --output-dir _ci_out/full_drift_big
-```
-
-NullTrace:
-```bash
-python fluxguard.py nulltrace --runs 500 --output-dir _ci_out/nulltrace_big
-```
-
-## Multi-seuils et seuils extrêmes
-RiftLens (standalone):
-```bash
-python fluxguard.py riftlens --input datasets/example_drift.csv --thresholds 0.1 0.3 0.5 0.7 0.9 0.95 --output-dir _ci_out/riftlens_ext
-```
-
-Chaîne complète:
-```bash
-python fluxguard.py all --shadow-prev datasets/example.csv --shadow-curr datasets/example_drift.csv \
-  --rift-thresholds 0.1 0.3 0.5 0.7 0.9 0.95 --output-dir _ci_out/full_ext
-```
-
-## Note importante
-VoidMark n'est pas un détecteur de drift via l'entropie moyenne. Sa valeur ajoutée est l'intégrité:
-- `base_sha256` change quand le target change
-- l'entropie moyenne doit rester stable autour de ~4.9 bits (si elle saute, c'est un signal de non-uniformité ou d'artefact).
-NullTrace, dans sa forme actuelle, ne lit pas le dataset. Il sert de soak déterministe.
+## CI
+Workflow inclus: .github/workflows/blank.yml en ubuntu-22.04, matrix 3.11/3.12, upload des artefacts.

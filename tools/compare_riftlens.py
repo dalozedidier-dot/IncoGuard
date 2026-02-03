@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
-"""Compare deux sorties RiftLens (avant vs drift) et imprime un delta."""
-
+"""
+Compare deux dossiers step1_riftlens et imprime les deltas d'aretes.
+Usage:
+  python tools/compare_riftlens.py <dir_prev> <dir_curr>
+"""
 from __future__ import annotations
 
 import json
@@ -34,7 +37,7 @@ def main() -> None:
     reps1 = sorted(d1.glob("riftlens_report_thr_*.json"))
     reps2 = sorted(d2.glob("riftlens_report_thr_*.json"))
     if not reps1 or not reps2:
-        print("Aucun report trouvé", file=sys.stderr)
+        print("Aucun report trouve", file=sys.stderr)
         raise SystemExit(2)
 
     by_name2 = {p.name: p for p in reps2}

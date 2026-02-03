@@ -8,7 +8,7 @@ on:
 jobs:
   smoke:
     runs-on: ubuntu-22.04
-    timeout-minutes: 25
+    timeout-minutes: 20
 
     strategy:
       fail-fast: false
@@ -21,7 +21,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -37,19 +36,10 @@ jobs:
           docker-images: false
           swap-storage: false
 
-      - name: Debug runner state
-        run: |
-          set -euo pipefail
-          echo "ImageOS: $ImageOS"
-          echo "Runner: $RUNNER_OS"
-          df -h
-          free -h
-          uname -a
-
       - name: Smoke test with retry
         uses: nick-fields/retry@v3
         with:
-          timeout_minutes: 20
+          timeout_minutes: 15
           max_attempts: 3
           retry_on: error
           command: |
@@ -60,7 +50,9 @@ jobs:
               printf "seed=ci\n" > .github/constraints.txt
             fi
             python -m compileall -q .
+            python -m unittest discover -s ../tests -p "test_*.py" -v
             python fluxguard.py all --shadow-prev datasets/example.csv --shadow-curr datasets/example_drift.csv --output-dir _ci_out/full
+            python fluxguard.py nulltrace --runs 25 --data-aware --input datasets/example_drift.csv --rules ../rules.yml --output-dir _ci_out/nulltrace
 
       - name: Upload artifacts
         if: always()
