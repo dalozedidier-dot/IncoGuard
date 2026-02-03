@@ -302,7 +302,8 @@ def voidmark_run_stress_test(
         fp_block = compare_fingerprints(fingerprint_csv_path, baseline_mark=baseline_mark, alpha=float(ks_alpha))
 
     mark: Dict[str, Any] = {
-        "target": str(target),
+        "target_name": target.name,
+        "target_kind": ("dir" if target.is_dir() else "file"),
         "base_sha256": base_hash,
         "seed": int(seed),
         "noise": float(noise),
@@ -327,4 +328,4 @@ def voidmark_run_stress_test(
         }
         update_version_history(version_db, entry)
 
-    return {"mark": str(mark_path), "summary": summary, "drift_signals": mark.get("drift_signals")}
+    return {"mark": "vault/voidmark_mark.json", "summary": summary, "drift_signals": mark.get("drift_signals")}

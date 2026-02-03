@@ -216,6 +216,6 @@ def riftlens_run_csv(
 
         out = output_dir / f"riftlens_report_thr_{float(thr):.2f}.json"
         write_report(graph, out)
-        reports.append({"threshold": float(thr), "report": str(out)})
+        reports.append({"threshold": float(thr), "report": out.name})
 
     return {"input": str(input_csv), "reports": reports}

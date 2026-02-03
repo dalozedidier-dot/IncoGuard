@@ -8,6 +8,12 @@ from typing import Any, Dict, List, Optional
 from riftlens.core import riftlens_run_csv
 from voidmark.vault import voidmark_run_stress_test
 
+def relpath(p: Path, base: Path) -> str:
+    try:
+        return p.relative_to(base).as_posix()
+    except Exception:
+        return p.as_posix()
+
 
 def sha256_file(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()
@@ -75,7 +81,7 @@ def run_full_chain(
     )
 
     chain = {
-        "inputs": str(step0 / "inputs_report.json"),
+        "inputs": relpath(step0 / "inputs_report.json", output_dir),
         "riftlens": rift,
         "voidmark": void,
         "params": {
