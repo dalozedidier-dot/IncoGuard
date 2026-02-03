@@ -1,0 +1,86 @@
+name: fluxguard-ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Detect project directory
+        id: proj
+        shell: bash
+        run: |
+          if [ -f fluxguard.py ]; then
+            echo "dir=." >> "$GITHUB_OUTPUT"
+            echo "entry=fluxguard.py" >> "$GITHUB_OUTPUT"
+          elif [ -f fluxguard/fluxguard.py ]; then
+            echo "dir=fluxguard" >> "$GITHUB_OUTPUT"
+            echo "entry=fluxguard.py" >> "$GITHUB_OUTPUT"
+          else
+            echo "ERREUR: fluxguard.py introuvable"
+            ls -la
+            ls -la fluxguard || true
+            exit 2
+          fi
+
+      - name: Prep
+        working-directory: ${{ steps.proj.outputs.dir }}
+        run: |
+          python -V
+          mkdir -p _ci_out
+          mkdir -p .github
+          if [ ! -f .github/constraints.txt ]; then
+            printf "seed=ci\n" > .github/constraints.txt
+          fi
+
+      - name: Syntax check
+        working-directory: ${{ steps.proj.outputs.dir }}
+        run: |
+          python -m compileall -q .
+
+      - name: NullTrace smoke
+        working-directory: ${{ steps.proj.outputs.dir }}
+        env:
+          SOURCE_DATE_EPOCH: "0"
+        run: |
+          python ${{ steps.proj.outputs.entry }} nulltrace --runs 10 --output-dir _ci_out/nulltrace
+
+      - name: RiftLens smoke
+        working-directory: ${{ steps.proj.outputs.dir }}
+        run: |
+          python ${{ steps.proj.outputs.entry }} riftlens --input datasets/example.csv --output-dir _ci_out/riftlens
+
+      - name: VoidMark smoke
+        working-directory: ${{ steps.proj.outputs.dir }}
+        run: |
+          python ${{ steps.proj.outputs.entry }} voidmark --input datasets/example.csv --runs 20 --output-dir _ci_out/voidmark
+
+      - name: Full chain smoke
+        working-directory: ${{ steps.proj.outputs.dir }}
+        run: |
+          python ${{ steps.proj.outputs.entry }} all --shadow-prev datasets/example.csv --shadow-curr datasets/example.csv --output-dir _ci_out/full
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fluxguard-ci-${{ matrix.python-version }}
+          path: ${{ steps.proj.outputs.dir }}/_ci_out
+          if-no-files-found: error
