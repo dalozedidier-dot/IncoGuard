@@ -28,14 +28,23 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Debug runner state (avant crash)
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: false
+          android: false
+          dotnet: false
+          haskell: false
+          large-packages: false
+          docker-images: false
+          swap-storage: false
+
+      - name: Debug avant
         run: |
-          free -h
           df -h
-          top -b -n1 | head -20
+          free -h
           echo "ImageOS: $ImageOS"
           echo "Runner version: $(cat /home/runner/.runner-version 2>/dev/null || echo 'unknown')"
-          uname -a
 
       - name: Prep
         working-directory: fluxguard
@@ -47,9 +56,8 @@ jobs:
             printf "seed=ci\n" > .github/constraints.txt
           fi
 
-      - name: Smoke test (retry)
-        # Pour du simple monitoring (non bloquant), tu peux activer:
-        # continue-on-error: true
+      - name: Smoke test retry
+        continue-on-error: true  # temporaire: met à false pour rebloquer les PRs
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 15
@@ -68,9 +76,16 @@ jobs:
             python fluxguard.py voidmark --input datasets/example.csv --runs 20 --output-dir _ci_out/voidmark
             python fluxguard.py all --shadow-prev datasets/example.csv --shadow-curr datasets/example.csv --output-dir _ci_out/full
 
+      - name: Debug après
+        if: always()
+        run: |
+          df -h
+          free -h
+
       - name: Upload artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: fluxguard-ci-${{ matrix.python-version }}
           path: fluxguard/_ci_out
-          if-no-files-found: error
+          if-no-files-found: warn
