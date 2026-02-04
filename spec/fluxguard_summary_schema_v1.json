@@ -1,0 +1,35 @@
+{
+  "properties": {
+    "audit": {
+      "additionalProperties": true,
+      "properties": {
+        "files_sha256": {
+          "type": "object"
+        },
+        "normalized_at_utc": {
+          "type": "string"
+        },
+        "normalized_by": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "command": {
+      "type": "string"
+    },
+    "generated_at_utc": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "command",
+    "generated_at_utc",
+    "status"
+  ],
+  "title": "fluxguard_summary_schema_v1",
+  "type": "object"
+}

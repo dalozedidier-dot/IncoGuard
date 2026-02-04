@@ -1,36 +1,18 @@
-EchoNull determinism and stability update bundle v1
+FluxGuard audit fix bundle v1
 
-Goal
-Stabilize outputs across runs by controlling randomness, limiting parallelism, and making JSON serialization stable.
+Objectif
+- Corriger generated_at_utc (valeur epoch 1970) dans les fluxguard_summary.json
+- Rendre les summaries auditables en ajoutant les SHA256 des artefacts référencés quand ils existent dans le bundle
+- Propager les paramètres effectifs du module VoidMark (runs, noise, seed) dans les summaries qui le référencent
+- Optionnel: quantifier les flottants à l’écriture JSON pour neutraliser des micro-écarts inter Python et inter OS
 
-What this bundle contains
-1) common/determinism.py
-Seed utilities for random and numpy with a single seed effective model, plus UTC timestamp helper.
+Usage (post-traitement d'un dossier d'artefacts dézippé)
+1) python tools/fluxguard_normalize_outputs.py /chemin/vers/artefacts
+   Exemple: python tools/fluxguard_normalize_outputs.py ./_ci_out
 
-2) common/jsonio.py
-Stable JSON writer with optional float quantization for cross Python determinism.
-
-3) scripts/patch_orchestrator_determinism.py
-Best effort patcher that tries to inject deterministic seeding and CLI flags into the orchestrator runner.
-It creates .bak backups for modified files.
-
-4) scripts/inspect_soak_outliers.py
-Tool to scan an output directory and print the worst runs based on delta_stats and graph metrics.
-
-5) scripts/check_output_hashes.py
-Tool to compare two output directories and report exact file hash differences.
-
-How to apply
-1) Unzip at repo root
-2) Run:
-   python scripts/patch_orchestrator_determinism.py
-
-3) Review changes:
-   git diff
-
-4) Run a deterministic soak locally:
-   python -m orchestrator.run --runs 50 --out _soak_out --workers 1 --seed-base 1000 --seed-mode per-run --deterministic --zip
+2) Optionnel: python tools/fluxguard_quantize_json.py /chemin/vers/artefacts --ndigits 12
 
 Notes
-- If your orchestrator CLI does not match the patcher patterns, the patcher will not modify code. In that case, apply the changes manually using the added helper modules.
-- For strict determinism across Python versions, set JSON quantization digits to 12 in common/jsonio.py.
+- Le normalizer ne modifie pas les fichiers voidmark_mark.json, il enrichit les summaries pour audit.
+- Le normalizer n’invente pas de seed_base. Il reporte la seed telle qu’écrite par VoidMark.
+- Si tu veux une seed unique et traçable, ajoute seed_requested et seed_effective au générateur et reporte les deux partout.
