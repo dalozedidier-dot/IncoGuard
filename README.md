@@ -1,21 +1,36 @@
-# FluxGuard
+EchoNull determinism and stability update bundle v1
 
-CLI unique, modulaire, léger, déterministe, sans dépendances externes.
+Goal
+Stabilize outputs across runs by controlling randomness, limiting parallelism, and making JSON serialization stable.
 
-## Exécution (local)
+What this bundle contains
+1) common/determinism.py
+Seed utilities for random and numpy with a single seed effective model, plus UTC timestamp helper.
 
-Depuis `fluxguard/` :
+2) common/jsonio.py
+Stable JSON writer with optional float quantization for cross Python determinism.
 
-```bash
-python fluxguard.py nulltrace --runs 10 --output-dir _ci_out/nulltrace
-python fluxguard.py riftlens --input datasets/example.csv --output-dir _ci_out/riftlens
-python fluxguard.py voidmark --input datasets/example.csv --runs 50 --output-dir _ci_out/voidmark
-python fluxguard.py all --shadow-prev datasets/example.csv --shadow-curr datasets/example.csv --output-dir _ci_out/full
-```
+3) scripts/patch_orchestrator_determinism.py
+Best effort patcher that tries to inject deterministic seeding and CLI flags into the orchestrator runner.
+It creates .bak backups for modified files.
 
-## CI
+4) scripts/inspect_soak_outliers.py
+Tool to scan an output directory and print the worst runs based on delta_stats and graph metrics.
 
-Le workflow CI est dans `.github/workflows/blank.yml`:
-- runner épinglé sur `ubuntu-22.04`
-- matrix Python 3.11 / 3.12
-- retry (3 tentatives) sur la suite smoke
+5) scripts/check_output_hashes.py
+Tool to compare two output directories and report exact file hash differences.
+
+How to apply
+1) Unzip at repo root
+2) Run:
+   python scripts/patch_orchestrator_determinism.py
+
+3) Review changes:
+   git diff
+
+4) Run a deterministic soak locally:
+   python -m orchestrator.run --runs 50 --out _soak_out --workers 1 --seed-base 1000 --seed-mode per-run --deterministic --zip
+
+Notes
+- If your orchestrator CLI does not match the patcher patterns, the patcher will not modify code. In that case, apply the changes manually using the added helper modules.
+- For strict determinism across Python versions, set JSON quantization digits to 12 in common/jsonio.py.
