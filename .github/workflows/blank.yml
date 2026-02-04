@@ -15,22 +15,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04
+          - os: ubuntu-22.04
             python-version: "3.11"
             experimental: false
-          - os: ubuntu-24.04
+          - os: ubuntu-22.04
             python-version: "3.12"
             experimental: false
-          - os: ubuntu-22.04
+          - os: ubuntu-24.04
             python-version: "3.11"
             experimental: true
-          - os: ubuntu-22.04
+          - os: ubuntu-24.04
             python-version: "3.12"
             experimental: true
 
     env:
       PYTHONHASHSEED: "0"
-      # SOURCE_DATE_EPOCH: "0"
+      # SOURCE_DATE_EPOCH: "0"   # Décommentez seulement si besoin de timestamps 1970 pour drift tests déterministes
 
     steps:
       - name: Checkout
@@ -46,7 +46,7 @@ jobs:
             fluxguard/pyproject.toml
             fluxguard/setup.py
 
-      - name: Show system resources
+      - name: System debug (resources + OS)
         run: |
           free -h
           df -h
@@ -58,6 +58,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           python -m venv .venv
           source .venv/bin/activate
           python -m pip install --upgrade pip setuptools wheel
@@ -66,10 +67,26 @@ jobs:
           python -m pip cache dir
           python -m pip cache info || true
 
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
-          if [ -f requirements-optional.txt ]; then pip install -r requirements-optional.txt; fi
+          # Install uniquement si le fichier existe (et fail si pip échoue)
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          else
+            echo "No requirements.txt (skip)"
+          fi
 
+          if [ -f requirements-dev.txt ]; then
+            pip install -r requirements-dev.txt
+          else
+            echo "No requirements-dev.txt (skip)"
+          fi
+
+          if [ -f requirements-optional.txt ]; then
+            pip install -r requirements-optional.txt
+          else
+            echo "No requirements-optional.txt (skip)"
+          fi
+
+          echo "pip list (freeze):"
           pip list --format=freeze
 
       - name: Prepare directories & constraints
@@ -77,12 +94,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p _ci_out _ci
-          if [ ! -f _ci/constraints.txt ]; then
-            printf "seed=ci\n" > _ci/constraints.txt
-          fi
+          mkdir -p _ci_out .github
+          [ -f .github/constraints.txt ] || echo "seed=ci" > .github/constraints.txt
 
-      - name: Smoke tests with retry
+      - name: Smoke suite with granular retry
         working-directory: fluxguard
         shell: bash
         run: |
@@ -93,13 +108,13 @@ jobs:
           for attempt in 1 2 3; do
             echo ""
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo " Attempt ${attempt}/3"
+            echo " Attempt ${attempt}/3 ──────────────────"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
             rm -rf _ci_out
             mkdir -p _ci_out
 
-            python -m compileall -q . 2>/dev/null || echo "compileall had warnings"
+            python -m compileall -q . 2>/dev/null || echo "compileall warnings (non-fatal)"
 
             echo "→ nulltrace"
             python fluxguard.py nulltrace --runs 10 --output-dir _ci_out/nulltrace || { echo "nulltrace failed"; continue; }
@@ -110,26 +125,23 @@ jobs:
             echo "→ voidmark"
             python fluxguard.py voidmark --input datasets/example.csv --runs 20 --output-dir _ci_out/voidmark || { echo "voidmark failed"; continue; }
 
-            echo "→ all (shadow)"
+            echo "→ all (shadow comparison)"
             python fluxguard.py all --shadow-prev datasets/example.csv --shadow-curr datasets/example.csv --output-dir _ci_out/full || { echo "all failed"; continue; }
 
-            echo "All smoke commands succeeded"
+            echo "Smoke suite passed on attempt ${attempt}"
             success=true
             break
           done
 
-          if [ "$success" != "true" ]; then
-            echo "Smoke suite failed after 3 attempts"
-            exit 1
-          fi
+          [ "$success" = true ] || { echo "Smoke failed after 3 attempts"; exit 1; }
 
-      - name: Extra debug information on failure
+      - name: Debug on failure (env + packages)
         if: failure()
         working-directory: fluxguard
         shell: bash
         run: |
           source .venv/bin/activate || true
-          echo "OS release:"
+          echo "OS details:"
           cat /etc/os-release 2>/dev/null || lsb_release -a
           echo "Python & pip:"
           python --version
@@ -141,6 +153,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fluxguard-smoke-${{ matrix.os }}-py${{ matrix.python-version }}-${{ github.run_attempt }}
+          name: fluxguard-smoke-${{ matrix.os }}-py${{ matrix.python-version }}-attempt${{ github.run_attempt }}
           path: fluxguard/_ci_out
           if-no-files-found: warn
