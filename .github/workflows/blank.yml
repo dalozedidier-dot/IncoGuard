@@ -7,17 +7,31 @@ on:
 
 jobs:
   smoke:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 45          # Augmenté : smoke avec runs=10/20 + compileall peut prendre >20 min
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.experimental }}
+    timeout-minutes: 20
 
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        include:
+          - os: ubuntu-22.04
+            python-version: "3.11"
+            experimental: false
+          - os: ubuntu-22.04
+            python-version: "3.12"
+            experimental: false
+          - os: ubuntu-24.04
+            python-version: "3.11"
+            experimental: true
+          - os: ubuntu-24.04
+            python-version: "3.12"
+            experimental: true
 
     env:
       PYTHONHASHSEED: "0"
-      SOURCE_DATE_EPOCH: "0"
+      # IMPORTANT: retire SOURCE_DATE_EPOCH=0 si tu veux arrêter les timestamps 1970
+      # SOURCE_DATE_EPOCH: "0"
 
     steps:
       - name: Checkout
@@ -27,82 +41,93 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip'                      # ← Gain majeur sur install deps
+          cache: 'pip'
+          cache-dependency-path: |
+            fluxguard/requirements.txt
+            fluxguard/requirements-dev.txt
+            fluxguard/pyproject.toml
 
-      - name: Debug resources & env
+      - name: Debug resources
         run: |
           free -h
           df -h
           uname -a
-          lsb_release -a || cat /etc/os-release
-          python -V
-          pip --version
-
-      - name: Create virtual environment
-        working-directory: fluxguard
-        run: python -m venv .venv
-
-      - name: Install dependencies
-        working-directory: fluxguard
-        run: |
-          source .venv/bin/activate
-          python -m pip install --upgrade pip setuptools wheel
-          pip install -r ../requirements.txt || true          # root req si existant
-          pip install -r requirements.txt || true             # fluxguard/req
-          pip install -r requirements-optional.txt || true    # si rupture, numpy, etc.
-          pip list
 
       - name: Prep
         working-directory: fluxguard
+        shell: bash
         run: |
-          mkdir -p _ci_out .github
+          python -V
+          mkdir -p _ci_out
+          mkdir -p .github
           if [ ! -f .github/constraints.txt ]; then
             printf "seed=ci\n" > .github/constraints.txt
           fi
 
-      - name: Smoke suite with retry & better logging
+      - name: Create venv
+        working-directory: fluxguard
+        shell: bash
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          python -m pip install --upgrade pip setuptools wheel
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+          if [ -f requirements-dev.txt ]; then
+            pip install -r requirements-dev.txt
+          fi
+
+      - name: Smoke suite with retry
         working-directory: fluxguard
         shell: bash
         run: |
           set -euo pipefail
 
-          source .venv/bin/activate
-
-          for attempt in {1..3}; do
-            echo "────────────────────────────────────────"
-            echo "Attempt ${attempt}/3 ───────────────────────"
-            echo "────────────────────────────────────────"
-
+          success=0
+          for attempt in 1 2 3; do
+            echo "Attempt ${attempt}/3"
             rm -rf _ci_out
             mkdir -p _ci_out
 
-            python -m compileall -q . || echo "Compileall warning (non-blocking)"
+            if (
+              source .venv/bin/activate
+              python -m compileall -q .
 
-            # Exécuter chaque commande séparément → meilleur diagnostic
-            python fluxguard.py nulltrace --runs 10 --output-dir _ci_out/nulltrace || { echo "nulltrace failed"; continue; }
-            python fluxguard.py riftlens --input datasets/example.csv --output-dir _ci_out/riftlens || { echo "riftlens failed"; continue; }
-            python fluxguard.py voidmark --input datasets/example.csv --runs 20 --output-dir _ci_out/voidmark || { echo "voidmark failed"; continue; }
-            python fluxguard.py all --shadow-prev datasets/example.csv --shadow-curr datasets/example.csv --output-dir _ci_out/full || { echo "full run failed"; continue; }
-
-            echo "All smoke commands succeeded on attempt ${attempt}"
-            exit 0
+              python fluxguard.py nulltrace --runs 10 --output-dir _ci_out/nulltrace
+              python fluxguard.py riftlens  --input datasets/example.csv --output-dir _ci_out/riftlens
+              python fluxguard.py voidmark  --input datasets/example.csv --runs 20 --output-dir _ci_out/voidmark
+              python fluxguard.py all       --shadow-prev datasets/example.csv --shadow-curr datasets/example.csv --output-dir _ci_out/full
+            ); then
+              echo "Smoke OK"
+              success=1
+              break
+            else
+              echo "Attempt ${attempt} failed"
+              sleep $((attempt * 5))
+            fi
           done
 
-          echo "All attempts failed — marking job as failed"
-          exit 1
+          if [ "${success}" -ne 1 ]; then
+            echo "Smoke failed after 3 attempts"
+            exit 1
+          fi
 
-      - name: Upload artifacts (on success or failure)
+      - name: Debug on failure
+        if: failure()
+        working-directory: fluxguard
+        shell: bash
+        run: |
+          source .venv/bin/activate || true
+          lsb_release -a || cat /etc/os-release
+          python --version
+          pip --version
+          pip list --format=freeze
+
+      - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fluxguard-smoke-${{ matrix.python-version }}-${{ github.run_attempt }}
+          name: fluxguard-ci-${{ matrix.os }}-py${{ matrix.python-version }}
           path: fluxguard/_ci_out
-          if-no-files-found: warn                # Moins strict que error
-
-      # Optionnel : tester ubuntu-24.04 en parallèle (monitoring)
-      # smoke-24:
-      #   runs-on: ubuntu-24.04
-      #   continue-on-error: true
-      #   timeout-minutes: 45
-      #   strategy: { matrix: { python-version: ["3.11", "3.12"] } }
-      #   steps: ... (mêmes steps que ci-dessus)
+          if-no-files-found: warn
