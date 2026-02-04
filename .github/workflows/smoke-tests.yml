@@ -5,7 +5,7 @@ on:
   pull_request:
   workflow_dispatch:
   schedule:
-    - cron: '0 3 * * *'
+    - cron: "0 3 * * *"  # nightly à 3h UTC
 
 concurrency:
   group: fluxguard-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
@@ -34,20 +34,31 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip'
+          cache: "pip"
           cache-dependency-path: |
             fluxguard/requirements*.txt
             fluxguard/pyproject.toml
             fluxguard/setup.py
 
-      - name: System debug (before)
+      - name: Debug Python and PEP 668 markers
+        run: |
+          set -e
+          which python || true
+          python --version || true
+          python -c "import sys; print('executable=', sys.executable); print('prefix=', sys.prefix); print('base_prefix=', getattr(sys,'base_prefix',None))" || true
+          which pip || true
+          pip --version || true
+          ls -la /usr/lib/python3*/EXTERNALLY-MANAGED 2>/dev/null || echo "No system EXTERNALLY-MANAGED marker found"
+          cat /etc/os-release
+
+      - name: System debug (resources)
         run: |
           free -h
           df -h
           uname -a
           lsb_release -a || cat /etc/os-release
 
-      - name: Setup FluxGuard environment
+      - name: Setup FluxGuard environment (venv + deps)
         working-directory: fluxguard
         shell: bash
         run: |
@@ -56,36 +67,42 @@ jobs:
           source .venv/bin/activate
           python -m pip install --upgrade pip setuptools wheel
 
+          # Install uniquement si le fichier existe (et fail si pip échoue)
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
           if [ -f requirements-optional.txt ]; then pip install -r requirements-optional.txt; fi
 
           pip list --format=freeze
 
-      - name: Generate reduced smoke sample
+      - name: Prepare directories + constraints + smoke sample
         working-directory: fluxguard
         shell: bash
         run: |
           set -euo pipefail
           source .venv/bin/activate
+
+          mkdir -p _ci_out/_meta _ci_out/_logs _ci
+          if [ ! -f _ci/constraints.txt ]; then
+            printf 'seed=ci\n' > _ci/constraints.txt
+          fi
+
           INPUT="datasets/example.csv"
           if [ -f datasets/example.csv ]; then
             python tools/make_smoke_sample.py datasets/example.csv datasets/example_smoke.csv --ratio 0.1 --max-rows 5000 --min-rows 200
             INPUT="datasets/example_smoke.csv"
           fi
-          echo "SMOKE_INPUT=${INPUT}" >> "$GITHUB_ENV"
 
-      - name: Run smoke suite (fast) with audit logs
+          echo "SMOKE_INPUT=${INPUT}" >> "$GITHUB_ENV"
+          echo "event=${GITHUB_EVENT_NAME}" > _ci_out/_meta/run_info.txt
+          echo "ref=${GITHUB_REF}" >> _ci_out/_meta/run_info.txt
+          echo "sha=${GITHUB_SHA}" >> _ci_out/_meta/run_info.txt
+
+      - name: Run smoke suite (fast) with retry and logs
         working-directory: fluxguard
         shell: bash
         run: |
           set -euo pipefail
           source .venv/bin/activate
-
-          mkdir -p _ci_out/_meta
-          echo "event=${GITHUB_EVENT_NAME}" > _ci_out/_meta/run_info.txt
-          echo "ref=${GITHUB_REF}" >> _ci_out/_meta/run_info.txt
-          echo "sha=${GITHUB_SHA}" >> _ci_out/_meta/run_info.txt
 
           python -m compileall -q . 2>/dev/null || true
 
@@ -93,31 +110,28 @@ jobs:
           for attempt in 1 2 3; do
             OUT="_ci_out/attempt_${attempt}"
             mkdir -p "${OUT}/_logs"
+
             echo "attempt=${attempt}" > "${OUT}/_logs/meta.txt"
             echo "input=${SMOKE_INPUT}" >> "${OUT}/_logs/meta.txt"
 
-            echo "Running nulltrace..."
             if ! python fluxguard.py nulltrace --runs 3 --output-dir "${OUT}/nulltrace" > "${OUT}/_logs/nulltrace.log" 2>&1; then
-              echo "nulltrace failed (attempt ${attempt})"
+              echo "nulltrace failed"
               sleep $((attempt * 10))
               continue
             fi
 
-            echo "Running riftlens..."
             if ! python fluxguard.py riftlens --input "${SMOKE_INPUT}" --output-dir "${OUT}/riftlens" > "${OUT}/_logs/riftlens.log" 2>&1; then
-              echo "riftlens failed (attempt ${attempt})"
+              echo "riftlens failed"
               sleep $((attempt * 10))
               continue
             fi
 
-            echo "Running voidmark..."
             if ! python fluxguard.py voidmark --input "${SMOKE_INPUT}" --runs 5 --output-dir "${OUT}/voidmark" > "${OUT}/_logs/voidmark.log" 2>&1; then
-              echo "voidmark failed (attempt ${attempt})"
+              echo "voidmark failed"
               sleep $((attempt * 10))
               continue
             fi
 
-            echo "Smoke succeeded (attempt ${attempt})"
             echo "success_attempt=${attempt}" > _ci_out/_meta/result.txt
             success=true
             break
@@ -127,12 +141,6 @@ jobs:
             echo "Smoke failed after 3 attempts" > _ci_out/_meta/result.txt
             exit 1
           fi
-
-      - name: System debug (after)
-        if: always()
-        run: |
-          free -h
-          df -h
 
       - name: Upload artifacts (always)
         if: always()
@@ -165,13 +173,13 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip'
+          cache: "pip"
           cache-dependency-path: |
             fluxguard/requirements*.txt
             fluxguard/pyproject.toml
             fluxguard/setup.py
 
-      - name: Setup FluxGuard environment
+      - name: Setup FluxGuard environment (venv + deps)
         working-directory: fluxguard
         shell: bash
         run: |
@@ -225,13 +233,13 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip'
+          cache: "pip"
           cache-dependency-path: |
             fluxguard/requirements*.txt
             fluxguard/pyproject.toml
             fluxguard/setup.py
 
-      - name: Setup FluxGuard environment
+      - name: Setup FluxGuard environment (venv + deps)
         working-directory: fluxguard
         shell: bash
         run: |
@@ -243,7 +251,7 @@ jobs:
           if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
           if [ -f requirements-optional.txt ]; then pip install -r requirements-optional.txt; fi
 
-      - name: Run nightly integration (full chain)
+      - name: Run nightly integration (full chain) with log
         working-directory: fluxguard
         shell: bash
         run: |
