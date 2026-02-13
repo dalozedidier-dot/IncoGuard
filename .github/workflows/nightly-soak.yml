@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: fluxguard-soak
+  group: incoguard-soak
   cancel-in-progress: false
 
 jobs:
@@ -35,7 +35,7 @@ jobs:
             fluxguard/pyproject.toml
             fluxguard/setup.py
 
-      - name: Prepare venv + deps
+      - name: Prepare venv + deps (IncoGuard)
         working-directory: fluxguard
         shell: bash
         run: |
@@ -56,10 +56,10 @@ jobs:
 
           rm -rf _ci_out && mkdir -p _ci_out
 
-          python fluxguard.py nulltrace --runs 10 --output-dir _ci_out/nulltrace
-          python fluxguard.py riftlens  --input datasets/example.csv --output-dir _ci_out/riftlens
-          python fluxguard.py voidmark  --input datasets/example.csv --runs 200 --output-dir _ci_out/voidmark
-          python fluxguard.py all       --shadow-prev datasets/example.csv --shadow-curr datasets/example.csv --output-dir _ci_out/full
+          python incoguard.py nulltrace --runs 10 --output-dir _ci_out/nulltrace
+          python incoguard.py riftlens  --input datasets/example.csv --output-dir _ci_out/riftlens
+          python incoguard.py voidmark  --input datasets/example.csv --runs 200 --output-dir _ci_out/voidmark
+          python incoguard.py all       --shadow-prev datasets/example.csv --shadow-curr datasets/example.csv --output-dir _ci_out/full
 
       - name: Integrity check (incoherence score)
         working-directory: fluxguard
@@ -73,6 +73,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fluxguard-soak-ubuntu-latest-py${{ matrix.python-version }}-${{ github.run_id }}
+          name: incoguard-soak-ubuntu-latest-py${{ matrix.python-version }}-${{ github.run_id }}
           path: fluxguard/_ci_out
           if-no-files-found: error

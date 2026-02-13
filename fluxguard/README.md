@@ -1,4 +1,4 @@
-FluxGuard CI Bundle v3
+IncoGuard CI Bundle v3
 
 But
 1) Immédiat: forcer ubuntu-22.04 partout pour supprimer les échecs liés à ubuntu-latest (Ubuntu 24.04).

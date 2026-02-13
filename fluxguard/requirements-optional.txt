@@ -1,4 +1,4 @@
-# Dépendances optionnelles FluxGuard (vNext).
+# Dépendances optionnelles IncoGuard (vNext).
 # Ce fichier est volontairement commenté pour ne pas alourdir les jobs CI.
 # Décommentez ce dont vous avez besoin en local ou dans un pipeline dédié.
 #

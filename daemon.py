@@ -252,7 +252,7 @@ def daemon_loop(
                     tick["alerts_fired"] = alerts_fired
 
                     if alerts_fired:
-                        title = "FluxGuard alert"
+                        title = "IncoGuard alert"
                         msg = json.dumps({"input": str(curr), "alerts": alerts_fired, "run_dir": str(run_dir)}, ensure_ascii=False)
                         notify(alerts, title=title, message=msg, payload={"alerts": alerts_fired, "run_dir": str(run_dir)})
 

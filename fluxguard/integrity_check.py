@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FluxGuard integrity check: score unique d'incohérence pour décider "ce batch est incohérent -> bloquer upstream".
+IncoGuard integrity check: score unique d'incohérence pour décider "ce batch est incohérent -> bloquer upstream".
 
 But:
 - Transformer des résultats soak (NullTrace / VoidMark / drift stats) en un indicateur unique et auditable.
@@ -239,7 +239,7 @@ def _pick_null_score(null: Dict[str, Any], mode: str) -> Tuple[Optional[float], 
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="FluxGuard integrity check: score unique d'incohérence")
+    ap = argparse.ArgumentParser(description="IncoGuard integrity check: score unique d'incohérence")
 
     ap.add_argument("--ci-out", type=Path, default=Path("_ci_out"))
     ap.add_argument("--threshold", type=float, default=0.25)
@@ -383,7 +383,7 @@ def main() -> None:
         json.dump(payload, f, indent=2, ensure_ascii=False, sort_keys=True)
 
     # ---- Always log a readable summary (important for CI) ----
-    print("FluxGuard integrity check")
+    print("IncoGuard integrity check")
     print(f"  weights: w_null={w_null:.3f} w_drift={w_drift:.3f} w_void={w_void:.3f}")
     print("  components:")
     print(
@@ -405,7 +405,7 @@ def main() -> None:
     # ---- Alerting only on BLOCK ----
     if inco > float(args.threshold):
         summary_text = (
-            f"FluxGuard BLOCK: incoherence_score={inco:.6f} threshold={args.threshold:.6f}\\n"
+            f"IncoGuard BLOCK: incoherence_score={inco:.6f} threshold={args.threshold:.6f}\\n"
             f"v_null={v_null:.6f} v_drift={v_drift:.6f} v_void={v_void:.6f}\\n"
             f"nulltrace_source={null_details.get('source')} voidmark_source={void_details.get('source')}\\n"
         )
@@ -428,7 +428,7 @@ def main() -> None:
                 smtp_password=args.smtp_password,
                 email_from=args.email_from,
                 email_to=args.email_to,
-                subject="FluxGuard BLOCK: incoherence_score",
+                subject="IncoGuard BLOCK: incoherence_score",
                 body=summary_text,
             )
             alert_msgs.append({"type": "email", "ok": ok, "detail": msg})

@@ -12,7 +12,7 @@ PKG = ROOT / "fluxguard"
 
 class TestSmoke(unittest.TestCase):
     def setUp(self) -> None:
-        self.tmp = Path(tempfile.mkdtemp(prefix="fluxguard_test_"))
+        self.tmp = Path(tempfile.mkdtemp(prefix="incoguard_test_"))
 
     def tearDown(self) -> None:
         shutil.rmtree(self.tmp, ignore_errors=True)
@@ -21,7 +21,7 @@ class TestSmoke(unittest.TestCase):
         out = self.tmp / "_ci_out" / "full"
         cmd = [
             sys.executable,
-            str(PKG / "fluxguard.py"),
+            str(PKG / "incoguard.py"),
             "all",
             "--shadow-prev",
             str(PKG / "datasets" / "example.csv"),

@@ -18,7 +18,7 @@ def sha256_file(p: Path) -> str:
 
 class TestDeterminism(unittest.TestCase):
     def setUp(self) -> None:
-        self.tmp = Path(tempfile.mkdtemp(prefix="fluxguard_det_"))
+        self.tmp = Path(tempfile.mkdtemp(prefix="incoguard_det_"))
 
     def tearDown(self) -> None:
         shutil.rmtree(self.tmp, ignore_errors=True)
@@ -34,7 +34,7 @@ class TestDeterminism(unittest.TestCase):
         def run(out: Path) -> None:
             cmd = [
                 sys.executable,
-                str(PKG / "fluxguard.py"),
+                str(PKG / "incoguard.py"),
                 "all",
                 "--shadow-prev",
                 str(PKG / "datasets" / "example.csv"),

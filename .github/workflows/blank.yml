@@ -1,4 +1,4 @@
-name: fluxguard-ci
+name: incoguard-ci
 
 on:
   push:
@@ -117,16 +117,16 @@ jobs:
             python -m compileall -q . 2>/dev/null || echo "compileall warnings (non-fatal)"
 
             echo "→ nulltrace"
-            python fluxguard.py nulltrace --runs 10 --output-dir _ci_out/nulltrace || { echo "nulltrace failed"; continue; }
+            python incoguard.py nulltrace --runs 10 --output-dir _ci_out/nulltrace || { echo "nulltrace failed"; continue; }
 
             echo "→ riftlens"
-            python fluxguard.py riftlens --input datasets/example.csv --output-dir _ci_out/riftlens || { echo "riftlens failed"; continue; }
+            python incoguard.py riftlens --input datasets/example.csv --output-dir _ci_out/riftlens || { echo "riftlens failed"; continue; }
 
             echo "→ voidmark"
-            python fluxguard.py voidmark --input datasets/example.csv --runs 20 --output-dir _ci_out/voidmark || { echo "voidmark failed"; continue; }
+            python incoguard.py voidmark --input datasets/example.csv --runs 20 --output-dir _ci_out/voidmark || { echo "voidmark failed"; continue; }
 
             echo "→ all (shadow comparison)"
-            python fluxguard.py all --shadow-prev datasets/example.csv --shadow-curr datasets/example.csv --output-dir _ci_out/full || { echo "all failed"; continue; }
+            python incoguard.py all --shadow-prev datasets/example.csv --shadow-curr datasets/example.csv --output-dir _ci_out/full || { echo "all failed"; continue; }
 
             echo "Smoke suite passed on attempt ${attempt}"
             success=true

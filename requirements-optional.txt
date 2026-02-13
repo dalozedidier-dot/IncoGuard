@@ -1,5 +1,5 @@
 # Dépendances optionnelles pour modes avancés.
-# FluxGuard fonctionne sans ces libs.
+# IncoGuard fonctionne sans ces libs.
 #
 # Modules historiques (si vous les utilisez):
 ruptures

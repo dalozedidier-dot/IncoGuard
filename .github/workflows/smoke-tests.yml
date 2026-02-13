@@ -8,7 +8,7 @@ on:
     - cron: "0 3 * * *"  # nightly à 3h UTC
 
 concurrency:
-  group: fluxguard-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  group: incoguard-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
 jobs:
@@ -58,7 +58,7 @@ jobs:
           uname -a
           lsb_release -a || cat /etc/os-release
 
-      - name: Setup FluxGuard environment (venv + deps)
+      - name: Setup IncoGuard environment (venv + deps)
         working-directory: fluxguard
         shell: bash
         run: |
@@ -114,19 +114,19 @@ jobs:
             echo "attempt=${attempt}" > "${OUT}/_logs/meta.txt"
             echo "input=${SMOKE_INPUT}" >> "${OUT}/_logs/meta.txt"
 
-            if ! python fluxguard.py nulltrace --runs 3 --output-dir "${OUT}/nulltrace" > "${OUT}/_logs/nulltrace.log" 2>&1; then
+            if ! python incoguard.py nulltrace --runs 3 --output-dir "${OUT}/nulltrace" > "${OUT}/_logs/nulltrace.log" 2>&1; then
               echo "nulltrace failed"
               sleep $((attempt * 10))
               continue
             fi
 
-            if ! python fluxguard.py riftlens --input "${SMOKE_INPUT}" --output-dir "${OUT}/riftlens" > "${OUT}/_logs/riftlens.log" 2>&1; then
+            if ! python incoguard.py riftlens --input "${SMOKE_INPUT}" --output-dir "${OUT}/riftlens" > "${OUT}/_logs/riftlens.log" 2>&1; then
               echo "riftlens failed"
               sleep $((attempt * 10))
               continue
             fi
 
-            if ! python fluxguard.py voidmark --input "${SMOKE_INPUT}" --runs 5 --output-dir "${OUT}/voidmark" > "${OUT}/_logs/voidmark.log" 2>&1; then
+            if ! python incoguard.py voidmark --input "${SMOKE_INPUT}" --runs 5 --output-dir "${OUT}/voidmark" > "${OUT}/_logs/voidmark.log" 2>&1; then
               echo "voidmark failed"
               sleep $((attempt * 10))
               continue
@@ -146,7 +146,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fluxguard-smoke-ubuntu-latest-py${{ matrix.python-version }}-attempt${{ github.run_attempt }}
+          name: incoguard-smoke-ubuntu-latest-py${{ matrix.python-version }}-attempt${{ github.run_attempt }}
           path: fluxguard/_ci_out
           if-no-files-found: error
 
@@ -179,7 +179,7 @@ jobs:
             fluxguard/pyproject.toml
             fluxguard/setup.py
 
-      - name: Setup FluxGuard environment (venv + deps)
+      - name: Setup IncoGuard environment (venv + deps)
         working-directory: fluxguard
         shell: bash
         run: |
@@ -199,15 +199,15 @@ jobs:
           source .venv/bin/activate
           rm -rf _ci_out && mkdir -p _ci_out/_logs
 
-          python fluxguard.py nulltrace --runs 3 --output-dir _ci_out/nulltrace > _ci_out/_logs/nulltrace.log 2>&1
-          python fluxguard.py riftlens  --input datasets/example.csv --output-dir _ci_out/riftlens > _ci_out/_logs/riftlens.log 2>&1
-          python fluxguard.py voidmark  --input datasets/example.csv --runs 5 --output-dir _ci_out/voidmark > _ci_out/_logs/voidmark.log 2>&1
+          python incoguard.py nulltrace --runs 3 --output-dir _ci_out/nulltrace > _ci_out/_logs/nulltrace.log 2>&1
+          python incoguard.py riftlens  --input datasets/example.csv --output-dir _ci_out/riftlens > _ci_out/_logs/riftlens.log 2>&1
+          python incoguard.py voidmark  --input datasets/example.csv --runs 5 --output-dir _ci_out/voidmark > _ci_out/_logs/voidmark.log 2>&1
 
       - name: Upload artifacts (always)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fluxguard-guard-ubuntu-22.04-py${{ matrix.python-version }}-attempt${{ github.run_attempt }}
+          name: incoguard-guard-ubuntu-22.04-py${{ matrix.python-version }}-attempt${{ github.run_attempt }}
           path: fluxguard/_ci_out
           if-no-files-found: warn
 
@@ -239,7 +239,7 @@ jobs:
             fluxguard/pyproject.toml
             fluxguard/setup.py
 
-      - name: Setup FluxGuard environment (venv + deps)
+      - name: Setup IncoGuard environment (venv + deps)
         working-directory: fluxguard
         shell: bash
         run: |
@@ -261,12 +261,12 @@ jobs:
           rm -rf _ci_out && mkdir -p _ci_out/_logs
           python -m compileall -q . 2>/dev/null || true
 
-          python fluxguard.py all --shadow-prev datasets/example.csv --shadow-curr datasets/example.csv --output-dir _ci_out/full > _ci_out/_logs/all.log 2>&1
+          python incoguard.py all --shadow-prev datasets/example.csv --shadow-curr datasets/example.csv --output-dir _ci_out/full > _ci_out/_logs/all.log 2>&1
 
       - name: Upload artifacts (always)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fluxguard-nightly-ubuntu-latest-py${{ matrix.python-version }}-${{ github.run_id }}
+          name: incoguard-nightly-ubuntu-latest-py${{ matrix.python-version }}-${{ github.run_id }}
           path: fluxguard/_ci_out
           if-no-files-found: error
